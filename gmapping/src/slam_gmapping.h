@@ -1,34 +1,3 @@
-/*
- * slam_gmapping
- * Copyright (c) 2008, Willow Garage, Inc.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the names of Stanford University or Willow Garage, Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived from
- *     this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- */
-
-/* Author: Brian Gerkey */
-
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
 #include "std_msgs/Float64.h"
@@ -42,6 +11,13 @@
 #include "gmapping/sensor/sensor_base/sensor.h"
 
 #include <boost/thread.hpp>
+#include <algorithm>
+
+#include <eigen3/Eigen/Jacobi>
+#include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Householder>
+
 
 class SlamGMapping
 {
@@ -57,8 +33,7 @@ class SlamGMapping
     void publishTransform();
   
     void laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan);
-    bool mapCallback(nav_msgs::GetMap::Request  &req,
-                     nav_msgs::GetMap::Response &res);
+    bool mapCallback(nav_msgs::GetMap::Request  &req, nav_msgs::GetMap::Response &res);
     void publishLoop(double transform_publish_period);
 
   private:
@@ -74,13 +49,8 @@ class SlamGMapping
 
     GMapping::GridSlamProcessor* gsp_;
     GMapping::RangeSensor* gsp_laser_;
-    // The angles in the laser, going from -x to x (adjustment is made to get the laser between
-    // symmetrical bounds as that's what gmapping expects)
     std::vector<double> laser_angles_;
-    // The pose, in the original laser frame, of the corresponding centered laser with z facing up
     tf::Stamped<tf::Pose> centered_laser_pose_;
-    // Depending on the order of the elements in the scan and the orientation of the scan frame,
-    // We might need to change the order of the scan
     bool do_reverse_range_;
     unsigned int gsp_laser_beam_count_;
     GMapping::OdometrySensor* gsp_odom_;
@@ -110,8 +80,13 @@ class SlamGMapping
     bool initMapper(const sensor_msgs::LaserScan& scan);
     bool addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose);
     double computePoseEntropy();
-    
-    // Parameters used by GMapping
+
+/*******************************these 3 functions are added for remove motion distortion**********************************/
+    void Lidar_Calibration(std::vector<double>& ranges,std::vector<double>& angles,ros::Time startTime,ros::Time endTime);
+    bool getLaserPose(tf::Stamped<tf::Pose> &odom_pose,ros::Time dt);
+    void Lidar_MotionCalibration(tf::Stamped<tf::Pose> frame_base_pose,tf::Stamped<tf::Pose> frame_start_pose,tf::Stamped<tf::Pose> frame_end_pose,
+                                               std::vector<double>& ranges,std::vector<double>& angles,int startIndex,int& beam_number);
+/*************************************************************************************************************************/
     double maxRange_;
     double maxUrange_;
     double maxrange_;
